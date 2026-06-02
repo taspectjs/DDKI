@@ -3,75 +3,67 @@ from datetime import date
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QHeaderView, QAbstractItemView, QFrame,
-    QDialog, QComboBox, QSpinBox, QDialogButtonBox,
+    QDialog, QComboBox, QSpinBox, QDialogButtonBox, QLineEdit,
+    QStyledItemDelegate, QCompleter,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer, QStringListModel
 from PySide6.QtGui import QColor, QFont
 from src.models import Entry, load_data, save_data, current_month_key, month_label
+from src.settings_data import load_routes
 from src.theme import theme_manager, Theme
 
 
-MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni",
-               "Juli", "August", "September", "Oktober", "November", "Dezember"]
-
-
-class MonthPickerDialog(QDialog):
-    def __init__(self, default_key: str, existing_keys: list[str], parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Monat hinzufügen")
-        self.setFixedSize(280, 140)
-
+class RouteDelegate(QStyledItemDelegate):
+    def createEditor(self, parent, option, index):
+        editor = QLineEdit(parent)
+        routes = load_routes()
         t = theme_manager.current
-        self.setStyleSheet(f"background: {t.content_bg}; color: {t.content_text};")
 
-        m, y = int(default_key.split(".")[0]), int(default_key.split(".")[1])
-
-        layout = QVBoxLayout(self)
-        layout.setSpacing(12)
-        layout.setContentsMargins(20, 20, 20, 20)
-
-        row = QHBoxLayout()
-
-        self._month_box = QComboBox()
-        for name in MONTH_NAMES:
-            self._month_box.addItem(name)
-        self._month_box.setCurrentIndex(m - 1)
-        self._month_box.setFixedHeight(34)
-
-        self._year_spin = QSpinBox()
-        self._year_spin.setRange(2000, 2100)
-        self._year_spin.setValue(y)
-        self._year_spin.setFixedWidth(80)
-        self._year_spin.setFixedHeight(34)
-
-        row.addWidget(self._month_box)
-        row.addWidget(self._year_spin)
-        layout.addLayout(row)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-        field = f"background: {t.content_bg}; color: {t.content_text}; border: 1px solid {t.sidebar_border}; border-radius: 6px; padding: 4px 8px; font-size: 13px;"
-        self._month_box.setStyleSheet(field)
-        self._year_spin.setStyleSheet(field)
-        buttons.setStyleSheet(f"""
-            QPushButton {{
-                background: {t.nav_active_text}; color: white; border: none;
-                border-radius: 6px; padding: 6px 16px; font-size: 13px;
-            }}
-            QPushButton[text="Cancel"], QPushButton[text="Abbrechen"] {{
-                background: transparent; color: {t.content_text};
-                border: 1px solid {t.sidebar_border};
+        editor.setStyleSheet(f"""
+            QLineEdit {{
+                background: {t.content_bg}; color: {t.content_text};
+                border: 1px solid {t.nav_active_text};
+                padding: 0 10px; font-size: 13px;
             }}
         """)
 
-    def result_key(self) -> str:
-        m = self._month_box.currentIndex() + 1
-        y = self._year_spin.value()
-        return f"{m:02d}.{y}"
+        if not routes:
+            return editor
 
+        preview = routes[:4]
+        completer = QCompleter(preview, editor)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)
+        completer.setCompletionMode(QCompleter.PopupCompletion)
+        completer.setMaxVisibleItems(6)
+
+        completer.popup().setStyleSheet(f"""
+            QListView {{
+                background: {t.content_bg}; color: {t.content_text};
+                border: 1px solid {t.sidebar_border}; border-radius: 6px;
+                font-size: 13px; outline: none; padding: 2px;
+            }}
+            QListView::item {{ padding: 5px 12px; border-radius: 4px; }}
+            QListView::item:selected {{
+                background: {t.nav_active_bg}; color: {t.nav_active_text};
+            }}
+        """)
+
+        editor.setCompleter(completer)
+
+        def show_popup():
+            completer.setModel(QStringListModel(preview, completer))
+            completer.complete()
+
+        def on_text_changed(text):
+            completer.setModel(QStringListModel(routes if text else preview, completer))
+            if not text:
+                completer.complete()
+
+        QTimer.singleShot(0, show_popup)
+        editor.textChanged.connect(on_text_changed)
+
+        return editor
 
 class MonthList(QWidget):
     month_selected = Signal(str)

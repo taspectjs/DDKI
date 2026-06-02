@@ -8,6 +8,7 @@ from src.updater import check_for_update
 from src.theme import theme_manager, Theme
 from src.entry_view import EntryView
 from src.dashboard import DashboardView
+from src.settings_view import SettingsView
 
 
 NAV_ITEMS = [
@@ -135,17 +136,16 @@ class ContentArea(QStackedWidget):
     def __init__(self):
         super().__init__()
 
-        self._dashboard = DashboardView()   # index 0 – Dashboard
-        self._entry_view = EntryView()      # index 1 – Dateien
+        self._dashboard = DashboardView()    # index 0
+        self._entry_view = EntryView()       # index 1
+        self._analyse_lbl = QLabel("Analyse")  # index 2
+        self._analyse_lbl.setAlignment(Qt.AlignCenter)
+        self._settings = SettingsView()      # index 3
+
         self.addWidget(self._dashboard)
         self.addWidget(self._entry_view)
-
-        self._placeholder_labels: list[QLabel] = []
-        for label, _ in NAV_ITEMS[2:]:      # Analyse, Einstellungen
-            lbl = QLabel(label)
-            lbl.setAlignment(Qt.AlignCenter)
-            self.addWidget(lbl)
-            self._placeholder_labels.append(lbl)
+        self.addWidget(self._analyse_lbl)
+        self.addWidget(self._settings)
 
         self._dashboard.refresh()
         self.apply_theme(theme_manager.current)
@@ -157,8 +157,9 @@ class ContentArea(QStackedWidget):
 
     def apply_theme(self, t: Theme):
         self.setStyleSheet(f"background: {t.content_bg};")
-        for lbl in self._placeholder_labels:
-            lbl.setStyleSheet(f"background: {t.content_bg}; color: {t.content_text}; font-size: 22px;")
+        self._analyse_lbl.setStyleSheet(
+            f"background: {t.content_bg}; color: {t.content_text}; font-size: 22px;"
+        )
 
 
 class MainWindow(QMainWindow):
