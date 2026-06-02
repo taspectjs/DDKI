@@ -29,7 +29,11 @@ def load_data() -> dict[str, list[Entry]]:
 
 
 def save_data(data: dict[str, list[Entry]]):
-    raw = {month: [asdict(e) for e in entries] for month, entries in data.items()}
+    raw = {
+        month: [asdict(e) for e in entries]
+        for month, entries in data.items()
+        if month and "." in month
+    }
     DATA_FILE.write_text(json.dumps(raw, indent=2, ensure_ascii=False))
 
 

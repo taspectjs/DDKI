@@ -252,6 +252,8 @@ class DayTable(QWidget):
 
     def load_month(self, key: str, entries: list[Entry]):
         self._month_key = key
+        if not key or "." not in key:
+            return
         self._title.setText(month_label(key))
 
         month, year = int(key.split(".")[0]), int(key.split(".")[1])
@@ -379,6 +381,15 @@ class DayTable(QWidget):
             self._error_panel.setVisible(True)
         else:
             self._error_panel.setVisible(False)
+
+    def focus_date(self, date_str: str):
+        for row in range(self._table.rowCount()):
+            item = self._table.item(row, 0)
+            if item and item.text() == date_str:
+                self._table.selectRow(row)
+                self._table.scrollToItem(item)
+                self._table.setCurrentCell(row, 1)
+                break
 
     def apply_theme(self, t: Theme):
         bg, text, border, hover, accent = (
@@ -554,8 +565,20 @@ class EntryView(QWidget):
             self._day_table._title.setText("")
 
     def _load_month(self, key: str):
+        if not key or "." not in key:
+            return
         self._data = load_data()
         self._day_table.load_month(key, self._data.get(key, []))
+
+    def navigate_to(self, month_key: str, date_str: str):
+        self._data = load_data()
+        if month_key not in self._data:
+            self._data[month_key] = []
+            save_data(self._data)
+        keys = sorted(self._data.keys())
+        self._month_list.populate(keys, select_key=month_key)
+        self._day_table.load_month(month_key, self._data.get(month_key, []))
+        self._day_table.focus_date(date_str)
 
     def _on_theme_change(self, t: Theme):
         self._month_list.apply_theme(t)

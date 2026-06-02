@@ -100,6 +100,9 @@ class Sidebar(QWidget):
             btn.setChecked(i == index)
         self.page_changed.emit(index)
 
+    def select_page(self, index: int):
+        self._select(index)
+
     def apply_theme(self, t: Theme):
         self.setStyleSheet(f"""
             QWidget {{
@@ -177,12 +180,18 @@ class MainWindow(QMainWindow):
 
         self._root = root
         self._sidebar.page_changed.connect(self._content.on_page_changed)
+        self._content._dashboard.navigate_to_date.connect(self._on_navigate_to_date)
         self.setCentralWidget(root)
 
         theme_manager.changed.connect(self._on_theme_change)
         self._apply_root_theme(theme_manager.current)
 
         self._check_updates()
+
+    def _on_navigate_to_date(self, month_key: str, date_str: str):
+        self._sidebar.select_page(1)
+        self._content.on_page_changed(1)
+        self._content._entry_view.navigate_to(month_key, date_str)
 
     def _apply_root_theme(self, t: Theme):
         self.setStyleSheet(f"QMainWindow {{ background: {t.content_bg}; }}")
