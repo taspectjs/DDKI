@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from PySide6.QtCore import QObject, Signal
+from src.settings_data import load_theme, save_theme
 
 
 @dataclass(frozen=True)
@@ -54,7 +55,7 @@ class ThemeManager(QObject):
 
     def __init__(self):
         super().__init__()
-        self._theme = LIGHT
+        self._theme = DARK if load_theme() == "dark" else LIGHT
 
     @property
     def current(self) -> Theme:
@@ -62,6 +63,7 @@ class ThemeManager(QObject):
 
     def toggle(self):
         self._theme = DARK if self._theme == LIGHT else LIGHT
+        save_theme(self._theme.name)
         self.changed.emit(self._theme)
 
 

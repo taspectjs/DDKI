@@ -22,3 +22,23 @@ def save_routes(routes: list[str]):
             pass
     data["routes"] = routes
     SETTINGS_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def load_theme() -> str:
+    if not SETTINGS_FILE.exists():
+        return "light"
+    try:
+        return json.loads(SETTINGS_FILE.read_text()).get("theme", "light")
+    except Exception:
+        return "light"
+
+
+def save_theme(name: str):
+    data = {}
+    if SETTINGS_FILE.exists():
+        try:
+            data = json.loads(SETTINGS_FILE.read_text())
+        except Exception:
+            pass
+    data["theme"] = name
+    SETTINGS_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))

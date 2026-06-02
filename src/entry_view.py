@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate, QCompleter,
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QStringListModel
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QPalette
 from src.models import Entry, load_data, save_data, current_month_key, month_label
 from src.settings_data import load_routes
 from src.theme import theme_manager, Theme
@@ -65,15 +65,165 @@ class RouteDelegate(QStyledItemDelegate):
 
         return editor
 
+
+MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni",
+               "Juli", "August", "September", "Oktober", "November", "Dezember"]
+
+
+def _month_key(k: str):
+    try:
+        m, y = k.split(".")
+        return (int(y), int(m))
+    except Exception:
+        return (0, 0)
+
+
+class MonthPickerDialog(QDialog):
+    def __init__(self, default_key: str, existing_keys: list[str], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Monat hinzufügen")
+        self.setFixedSize(300, 170)
+
+        t = theme_manager.current
+        self._month = int(default_key.split(".")[0])
+        self._year  = int(default_key.split(".")[1])
+
+        self.setStyleSheet(f"background: {t.content_bg}; color: {t.content_text};")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
+
+        title = QLabel("Monat hinzufügen")
+        title.setStyleSheet(f"color: {t.content_text}; font-size: 15px; font-weight: bold;")
+        layout.addWidget(title)
+
+        # ── Pfeil-Navigation ──────────────────────────────────────
+        nav = QHBoxLayout()
+        nav.setSpacing(6)
+
+        arrow_style = f"""
+            QPushButton {{
+                background: {t.nav_hover}; color: {t.content_text};
+                border: 1px solid {t.sidebar_border}; border-radius: 8px;
+                font-size: 16px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background: {t.sidebar_border}; }}
+        """
+        field_style = f"""
+            background: {t.nav_hover}; color: {t.content_text};
+            border: 1px solid {t.sidebar_border}; border-radius: 8px;
+            padding: 4px 10px; font-size: 14px; font-weight: bold;
+            qproperty-alignment: AlignCenter;
+        """
+
+        prev_m = QPushButton("‹")
+        prev_m.setFixedSize(36, 38)
+        prev_m.setStyleSheet(arrow_style)
+        prev_m.clicked.connect(self._prev_month)
+
+        self._month_lbl = QLabel(MONTH_NAMES[self._month - 1])
+        self._month_lbl.setFixedHeight(38)
+        self._month_lbl.setMinimumWidth(110)
+        self._month_lbl.setAlignment(Qt.AlignCenter)
+        self._month_lbl.setStyleSheet(field_style)
+
+        next_m = QPushButton("›")
+        next_m.setFixedSize(36, 38)
+        next_m.setStyleSheet(arrow_style)
+        next_m.clicked.connect(self._next_month)
+
+        prev_y = QPushButton("‹")
+        prev_y.setFixedSize(30, 38)
+        prev_y.setStyleSheet(arrow_style)
+        prev_y.clicked.connect(self._prev_year)
+
+        self._year_lbl = QLabel(str(self._year))
+        self._year_lbl.setFixedHeight(38)
+        self._year_lbl.setFixedWidth(56)
+        self._year_lbl.setAlignment(Qt.AlignCenter)
+        self._year_lbl.setStyleSheet(field_style)
+
+        next_y = QPushButton("›")
+        next_y.setFixedSize(30, 38)
+        next_y.setStyleSheet(arrow_style)
+        next_y.clicked.connect(self._next_year)
+
+        nav.addWidget(prev_m)
+        nav.addWidget(self._month_lbl, 1)
+        nav.addWidget(next_m)
+        nav.addSpacing(8)
+        nav.addWidget(prev_y)
+        nav.addWidget(self._year_lbl)
+        nav.addWidget(next_y)
+        layout.addLayout(nav)
+
+        # ── Buttons ───────────────────────────────────────────────
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        cancel_btn = QPushButton("Abbrechen")
+        cancel_btn.setFixedHeight(34)
+        cancel_btn.clicked.connect(self.reject)
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{ background: transparent; color: {t.content_text};
+                border: 1px solid {t.sidebar_border}; border-radius: 8px;
+                font-size: 13px; padding: 0 14px; }}
+            QPushButton:hover {{ background: {t.nav_hover}; }}
+        """)
+        ok_btn = QPushButton("Hinzufügen")
+        ok_btn.setFixedHeight(34)
+        ok_btn.setDefault(True)
+        ok_btn.clicked.connect(self.accept)
+        ok_btn.setStyleSheet(f"""
+            QPushButton {{ background: {t.nav_active_text}; color: white;
+                border: none; border-radius: 8px;
+                font-size: 13px; font-weight: bold; padding: 0 14px; }}
+            QPushButton:hover {{ background: {t.title_color}; }}
+        """)
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(ok_btn)
+        layout.addLayout(btn_row)
+
+    def _prev_month(self):
+        self._month -= 1
+        if self._month < 1:
+            self._month = 12
+            self._year -= 1
+            self._year_lbl.setText(str(self._year))
+        self._month_lbl.setText(MONTH_NAMES[self._month - 1])
+
+    def _next_month(self):
+        self._month += 1
+        if self._month > 12:
+            self._month = 1
+            self._year += 1
+            self._year_lbl.setText(str(self._year))
+        self._month_lbl.setText(MONTH_NAMES[self._month - 1])
+
+    def _prev_year(self):
+        self._year -= 1
+        self._year_lbl.setText(str(self._year))
+
+    def _next_year(self):
+        self._year += 1
+        self._year_lbl.setText(str(self._year))
+
+    def result_key(self) -> str:
+        return f"{self._month:02d}.{self._year}"
+
+
 class MonthList(QWidget):
     month_selected = Signal(str)
     month_delete_requested = Signal(str)
+    month_add_confirmed = Signal(str)   # emits "MM.YYYY"
 
     def __init__(self):
         super().__init__()
         self._rows: dict[str, QWidget] = {}
         self._buttons: dict[str, QPushButton] = {}
         self._selected: str | None = None
+        self._picker_month = 1
+        self._picker_year = 2026
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(8, 8, 8, 8)
@@ -84,21 +234,165 @@ class MonthList(QWidget):
 
         self._layout.addStretch()
 
+        # ── Inline Picker ─────────────────────────────────────────
+        self._picker = QFrame()
+        self._picker.setVisible(False)
+        picker_layout = QVBoxLayout(self._picker)
+        picker_layout.setContentsMargins(4, 8, 4, 4)
+        picker_layout.setSpacing(6)
+
+        # Month row
+        m_row = QHBoxLayout()
+        self._pm_btn = QPushButton("‹")
+        self._pm_btn.setFixedSize(28, 28)
+        self._pm_btn.clicked.connect(self._prev_month)
+        self._month_lbl = QLabel()
+        self._month_lbl.setAlignment(Qt.AlignCenter)
+        self._nm_btn = QPushButton("›")
+        self._nm_btn.setFixedSize(28, 28)
+        self._nm_btn.clicked.connect(self._next_month)
+        m_row.addWidget(self._pm_btn)
+        m_row.addWidget(self._month_lbl, 1)
+        m_row.addWidget(self._nm_btn)
+        picker_layout.addLayout(m_row)
+
+        # Year row
+        y_row = QHBoxLayout()
+        self._py_btn = QPushButton("‹")
+        self._py_btn.setFixedSize(28, 28)
+        self._py_btn.clicked.connect(self._prev_year)
+        self._year_lbl = QLabel()
+        self._year_lbl.setAlignment(Qt.AlignCenter)
+        self._ny_btn = QPushButton("›")
+        self._ny_btn.setFixedSize(28, 28)
+        self._ny_btn.clicked.connect(self._next_year)
+        y_row.addWidget(self._py_btn)
+        y_row.addWidget(self._year_lbl, 1)
+        y_row.addWidget(self._ny_btn)
+        picker_layout.addLayout(y_row)
+
+        # Confirm button
+        self._confirm_btn = QPushButton("Hinzufügen")
+        self._confirm_btn.setFixedHeight(30)
+        self._confirm_btn.clicked.connect(self._confirm)
+        picker_layout.addWidget(self._confirm_btn)
+
+        self._layout.addWidget(self._picker)
+
+        # ── Add button ────────────────────────────────────────────
         self._add_btn = QPushButton("+ Monat")
         self._add_btn.setFixedHeight(34)
+        self._add_btn.clicked.connect(lambda: self._show_picker())
         self._layout.addWidget(self._add_btn)
 
         self.apply_theme(theme_manager.current)
+
+    def _show_picker(self, default_key: str | None = None):
+        from datetime import date as _date
+        if default_key:
+            self._picker_month = int(default_key.split(".")[0])
+            self._picker_year  = int(default_key.split(".")[1])
+        else:
+            today = _date.today()
+            self._picker_month = today.month
+            self._picker_year  = today.year
+        self._update_picker_labels()
+        self._picker.setVisible(True)
+        self._add_btn.setVisible(False)
+
+    def _update_picker_labels(self):
+        self._month_lbl.setText(MONTH_NAMES[self._picker_month - 1])
+        self._year_lbl.setText(str(self._picker_year))
+
+    def _prev_month(self):
+        self._picker_month -= 1
+        if self._picker_month < 1:
+            self._picker_month = 12
+            self._picker_year -= 1
+        self._update_picker_labels()
+
+    def _next_month(self):
+        self._picker_month += 1
+        if self._picker_month > 12:
+            self._picker_month = 1
+            self._picker_year += 1
+        self._update_picker_labels()
+
+    def _prev_year(self):
+        self._picker_year -= 1
+        self._update_picker_labels()
+
+    def _next_year(self):
+        self._picker_year += 1
+        self._update_picker_labels()
+
+    def _confirm(self):
+        key = f"{self._picker_month:02d}.{self._picker_year}"
+        self._picker.setVisible(False)
+        self._add_btn.setVisible(True)
+        self.month_add_confirmed.emit(key)
+
+    def show_picker_with_default(self, default_key: str):
+        self._show_picker(default_key)
+
+    def apply_theme(self, t: Theme):
+        self.setStyleSheet(f"background: {t.nav_hover}; border-right: 1px solid {t.sidebar_border};")
+        self._header.setStyleSheet(
+            f"background: transparent; color: {t.content_text}; font-weight: bold; font-size: 13px; padding: 4px 6px 8px 6px;"
+        )
+        self._add_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {t.nav_active_text};
+                border: 1px solid {t.nav_active_text}; border-radius: 6px; font-size: 12px;
+            }}
+            QPushButton:hover {{ background: {t.nav_active_bg}; }}
+        """)
+        arrow_style = f"""
+            QPushButton {{
+                background: {t.sidebar_border}; color: {t.content_text};
+                border: none; border-radius: 6px; font-size: 14px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background: {t.nav_active_bg}; color: {t.nav_active_text}; }}
+        """
+        lbl_style = f"background: transparent; color: {t.content_text}; font-size: 13px; font-weight: bold;"
+        for w in (self._pm_btn, self._nm_btn, self._py_btn, self._ny_btn):
+            w.setStyleSheet(arrow_style)
+        for lbl in (self._month_lbl, self._year_lbl):
+            lbl.setStyleSheet(lbl_style)
+        self._confirm_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {t.nav_active_text}; color: white; border: none;
+                border-radius: 6px; font-size: 12px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background: {t.title_color}; }}
+        """)
+        self._picker.setStyleSheet(f"background: {t.nav_active_bg}; border-radius: 8px;")
 
     def populate(self, keys: list[str], select_key: str | None = None):
         for row in self._rows.values():
             self._layout.removeWidget(row)
             row.setParent(None)
+        for lbl in getattr(self, "_year_labels", []):
+            self._layout.removeWidget(lbl)
+            lbl.setParent(None)
         self._rows.clear()
         self._buttons.clear()
 
         insert_at = 1
+        self._year_labels: list[QLabel] = []
+        current_year = None
+
         for key in keys:
+            year = key.split(".")[1] if "." in key else ""
+
+            if year != current_year:
+                current_year = year
+                lbl = QLabel(year)
+                lbl.setFixedHeight(22)
+                self._layout.insertWidget(insert_at, lbl)
+                self._year_labels.append(lbl)
+                insert_at += 1
+
             row = QWidget()
             row.setFixedHeight(36)
             row.setAttribute(Qt.WA_StyledBackground, False)
@@ -155,6 +449,32 @@ class MonthList(QWidget):
             }}
             QPushButton:hover {{ background: {t.nav_active_bg}; }}
         """)
+        arrow_style = f"""
+            QPushButton {{
+                background: {t.sidebar_border}; color: {t.content_text};
+                border: none; border-radius: 6px; font-size: 14px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background: {t.nav_active_bg}; color: {t.nav_active_text}; }}
+        """
+        lbl_style = f"background: transparent; color: {t.content_text}; font-size: 13px; font-weight: bold;"
+        for w in (self._pm_btn, self._nm_btn, self._py_btn, self._ny_btn):
+            w.setStyleSheet(arrow_style)
+        for lbl in (self._month_lbl, self._year_lbl):
+            lbl.setStyleSheet(lbl_style)
+        self._confirm_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {t.nav_active_text}; color: white; border: none;
+                border-radius: 6px; font-size: 12px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background: {t.title_color}; }}
+        """)
+        self._picker.setStyleSheet(f"background: {t.nav_active_bg}; border-radius: 8px;")
+        for lbl in getattr(self, "_year_labels", []):
+            lbl.setStyleSheet(
+                f"background: transparent; color: {t.version_text}; "
+                f"font-size: 11px; font-weight: bold; padding-left: 8px; "
+                f"border-bottom: 1px solid {t.sidebar_border};"
+            )
         for key, row in self._rows.items():
             self._buttons[key].setStyleSheet(f"""
                 QPushButton {{
@@ -238,6 +558,7 @@ class DayTable(QWidget):
         self._table.setAlternatingRowColors(True)
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._table.cellChanged.connect(self._on_cell_changed)
+        self._table.setItemDelegateForColumn(1, RouteDelegate(self._table))
         layout.addWidget(self._table)
 
         self.apply_theme(theme_manager.current)
@@ -467,10 +788,10 @@ class EntryView(QWidget):
         layout.setSpacing(0)
 
         self._month_list = MonthList()
-        self._month_list.setFixedWidth(150)
+        self._month_list.setFixedWidth(175)
         self._month_list.month_selected.connect(self._load_month)
-        self._month_list._add_btn.clicked.connect(self._add_next_month)
         self._month_list.month_delete_requested.connect(self._delete_month)
+        self._month_list.month_add_confirmed.connect(self._on_month_add_confirmed)
         layout.addWidget(self._month_list)
 
         self._day_table = DayTable()
@@ -484,14 +805,16 @@ class EntryView(QWidget):
             key = current_month_key()
             self._data[key] = []
             save_data(self._data)
-        keys = sorted(self._data.keys())
-        self._month_list.populate(keys, select_key=keys[-1])
-        self._load_month(keys[-1])
+        keys = sorted(self._data.keys(), key=_month_key, reverse=True)
+        cur = current_month_key()
+        select = cur if cur in self._data else keys[0]
+        self._month_list.populate(keys, select_key=select)
+        self._load_month(select)
 
-    def _add_next_month(self):
-        keys = sorted(self._data.keys())
+    def _init_picker_default(self):
+        keys = sorted(self._data.keys(), key=_month_key)   # ascending → newest last
         if keys:
-            last = keys[-1]
+            last = keys[-1]                # newest existing month
             m, y = int(last.split(".")[0]), int(last.split(".")[1])
             m += 1
             if m > 12:
@@ -499,17 +822,13 @@ class EntryView(QWidget):
             default_key = f"{m:02d}.{y}"
         else:
             default_key = current_month_key()
+        self._month_list.show_picker_with_default(default_key)
 
-        dlg = MonthPickerDialog(default_key, keys, parent=self)
-        if dlg.exec() != QDialog.Accepted:
-            return
-
-        new_key = dlg.result_key()
+    def _on_month_add_confirmed(self, new_key: str):
         if new_key not in self._data:
             self._data[new_key] = []
             save_data(self._data)
-
-        keys = sorted(self._data.keys())
+        keys = sorted(self._data.keys(), key=_month_key, reverse=True)
         self._month_list.populate(keys, select_key=new_key)
         self._load_month(new_key)
 
@@ -547,7 +866,7 @@ class EntryView(QWidget):
         self._data.pop(key, None)
         save_data(self._data)
 
-        keys = sorted(self._data.keys())
+        keys = sorted(self._data.keys(), key=_month_key, reverse=True)
         if keys:
             self._month_list.populate(keys, select_key=keys[-1])
             self._load_month(keys[-1])
@@ -567,7 +886,7 @@ class EntryView(QWidget):
         if month_key not in self._data:
             self._data[month_key] = []
             save_data(self._data)
-        keys = sorted(self._data.keys())
+        keys = sorted(self._data.keys(), key=_month_key, reverse=True)
         self._month_list.populate(keys, select_key=month_key)
         self._day_table.load_month(month_key, self._data.get(month_key, []))
         self._day_table.focus_date(date_str)
