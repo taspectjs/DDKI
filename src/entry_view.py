@@ -216,6 +216,7 @@ class MonthList(QWidget):
     month_selected = Signal(str)
     month_delete_requested = Signal(str)
     month_add_confirmed = Signal(str)   # emits "MM.YYYY"
+    import_requested = Signal()
 
     def __init__(self):
         super().__init__()
@@ -284,6 +285,12 @@ class MonthList(QWidget):
         self._add_btn.setFixedHeight(34)
         self._add_btn.clicked.connect(lambda: self._show_picker())
         self._layout.addWidget(self._add_btn)
+
+        # ── Import button ─────────────────────────────────────────
+        self._import_btn = QPushButton("⬆ Import")
+        self._import_btn.setFixedHeight(34)
+        self._import_btn.clicked.connect(lambda: self.import_requested.emit())
+        self._layout.addWidget(self._import_btn)
 
         self.apply_theme(theme_manager.current)
 
@@ -448,6 +455,13 @@ class MonthList(QWidget):
                 border: 1px solid {t.nav_active_text}; border-radius: 6px; font-size: 12px;
             }}
             QPushButton:hover {{ background: {t.nav_active_bg}; }}
+        """)
+        self._import_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {t.version_text};
+                border: 1px solid {t.sidebar_border}; border-radius: 6px; font-size: 12px;
+            }}
+            QPushButton:hover {{ background: {t.nav_hover}; color: {t.content_text}; }}
         """)
         arrow_style = f"""
             QPushButton {{
@@ -792,6 +806,7 @@ class EntryView(QWidget):
         self._month_list.month_selected.connect(self._load_month)
         self._month_list.month_delete_requested.connect(self._delete_month)
         self._month_list.month_add_confirmed.connect(self._on_month_add_confirmed)
+        self._month_list.import_requested.connect(self._handle_import)
         layout.addWidget(self._month_list)
 
         self._day_table = DayTable()
@@ -890,6 +905,64 @@ class EntryView(QWidget):
         self._month_list.populate(keys, select_key=month_key)
         self._day_table.load_month(month_key, self._data.get(month_key, []))
         self._day_table.focus_date(date_str)
+
+    def _handle_import(self):
+        from PySide6.QtWidgets import QFileDialog, QMessageBox, QDialog
+        from src.importer import parse_file, analyze_import, apply_import
+        from src.import_dialog import ImportPreviewDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Datei für Import auswählen",
+            "",
+            "Tabellen (*.ods *.xlsx *.xls);;Alle Dateien (*)",
+        )
+        if not path:
+            return
+
+        try:
+            entries = parse_file(path)
+        except Exception as e:
+            QMessageBox.warning(self, "Import Fehler", f"Datei konnte nicht gelesen werden:\n{e}")
+            return
+
+        if not entries:
+            QMessageBox.information(
+                self, "Import", "Keine gültigen Einträge in der Datei gefunden."
+            )
+            return
+
+        data = load_data()
+        rows = analyze_import(entries, data)
+
+        dialog = ImportPreviewDialog(rows, parent=self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        selected = dialog.selected_rows()
+        if not selected:
+            return
+
+        data = apply_import(selected, data)
+        save_data(data)
+
+        self._data = load_data()
+        keys = sorted(self._data.keys(), key=_month_key, reverse=True)
+        cur = current_month_key()
+        select = cur if cur in self._data else (keys[0] if keys else None)
+        if select:
+            self._month_list.populate(keys, select_key=select)
+            self._load_month(select)
+
+        t = theme_manager.current
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Import erfolgreich")
+        msg.setText(f"{len(selected)} Einträge importiert.")
+        msg.setStyleSheet(f"""
+            QMessageBox {{ background: {t.content_bg}; }}
+            QLabel {{ color: {t.content_text}; background: transparent; }}
+        """)
+        msg.exec()
 
     def _on_theme_change(self, t: Theme):
         self._month_list.apply_theme(t)

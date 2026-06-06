@@ -2,7 +2,7 @@
 
 **DDKI** ist eine Linux-Desktop-Anwendung zur Erfassung, Verwaltung und Auswertung von täglichen Fahrstrecken – entwickelt mit Python und PySide6 (Qt6).
 
-> Version 0.4.0 · Linux · Python 3.11+
+> Version 0.5.0 · Linux · Python 3.11+
 
 ---
 
@@ -29,6 +29,8 @@
 - **Automatische Rundstreckenkalkulation** – eingegebene Kilometer werden automatisch mit ×2 als Hin-&-Zurück-Strecke berechnet
 - **Fehlervalidierung in Echtzeit** – ungültige Werte in der Fahrstrecke-Spalte erscheinen als aufklappbare Fehlerliste (max. 4 sichtbar)
 - **Dashboard mit Fehlende-Einträge-Assistent** – zeigt ausstehende Tage des aktuellen Monats zuerst, danach Monat für Monat; direkt von dort eintragen oder überspringen
+- **Import aus Tabellendateien** – ODS- und XLSX/XLS-Dateien importieren; Vorschau-Dialog zeigt jeden Eintrag farblich klassifiziert: grün = identisch (automatisch), blau = neu, orange = Konflikt (manuell bestätigen); Konflikte zeigen den aktuellen Wert zum Vergleich
+- **Analyse** – Jahresauswertung mit 4 Statistik-Kacheln (Gesamt-km, Ø km/Monat, häufigste Route, stärkster Monat), interaktivem Monats-Balkendiagramm und Routen-Jahresübersicht; Jahresselektor zum Blättern
 - **Einstellungen** – vordefinierte Routen/Orte hinzufügen und verwalten
 - **Light- & Dark-Mode** – per Knopfdruck umschaltbar, Auswahl wird gespeichert und beim nächsten Start wiederhergestellt
 - **Moderne Scrollbar** – gradient-gestylte Scrollbar mit Hover-Effekt
@@ -88,8 +90,8 @@ chmod +x DDKI-x.x.x-linux
 |------|----------|
 | **Dashboard** | Fehlende Einträge & Validierungsfehler aller Monate |
 | **Daten** | Monatsübersicht mit direkter Tageseintragung |
+| **Analyse** | Jahresauswertung mit Diagramm und Statistiken |
 | **Einstellungen** | Vordefinierte Routen verwalten |
-| Analyse | *(geplant)* |
 
 ---
 
@@ -122,6 +124,31 @@ Zeigt ausstehende Tage geordnet nach Priorität:
 |--------|----------|
 | **+ Eintragen** | Wechselt zu Daten, springt zur Zeile und setzt Cursor |
 | **Überspringen** | Blendet den Tag für die aktuelle Sitzung aus |
+
+---
+
+### Daten – Import aus Tabellendatei
+
+Über den **⬆ Import**-Button in der Monats-Sidebar können Fahrten aus `.ods`-, `.xlsx`- oder `.xls`-Dateien importiert werden:
+
+| Farbe | Bedeutung |
+|-------|-----------|
+| Grün | Eintrag ist identisch mit vorhandenen Daten – wird automatisch importiert |
+| Blau | Neuer Eintrag – standardmäßig ausgewählt |
+| Orange | Konflikt mit vorhandenem Eintrag – aktueller Wert wird angezeigt, manuell bestätigen |
+
+Mit **Alle auswählen** werden alle Konflikte auf einmal akzeptiert. Erst nach Klick auf **Importieren** werden Daten übernommen.
+
+---
+
+### Analyse – Jahresauswertung
+
+Unter **Analyse** werden alle Fahrten des gewählten Jahres ausgewertet:
+
+- **4 Statistik-Kacheln**: Gesamt-km (H & Z), Ø km/Monat, häufigste Route, stärkster Monat
+- **Balkendiagramm**: monatliche Kilometer (Hin & Zurück) für das gewählte Jahr
+- **Routen-Jahresübersicht**: alle Routen mit Fahrtenanzahl und Gesamt-km, absteigend sortiert
+- **Jahresselektor** (◀ / ▶) oben rechts zum Wechseln des Auswertungszeitraums
 
 ---
 
@@ -167,6 +194,9 @@ DDKI/
     ├── main_window.py    # Hauptfenster & Navigation
     ├── dashboard.py      # Dashboard
     ├── entry_view.py     # Monats- & Tagesansicht mit Autocomplete
+    ├── analyse_view.py   # Jahresanalyse mit Diagramm & Statistiken
+    ├── importer.py       # ODS/XLSX-Parser & Datenvergleich
+    ├── import_dialog.py  # Import-Vorschau-Dialog
     ├── settings_view.py  # Einstellungsseite
     ├── settings_data.py  # Routen & Theme-Speicherung
     ├── models.py         # Datenmodell & JSON-I/O
@@ -179,9 +209,11 @@ DDKI/
 ## Abhängigkeiten
 
 ```
-PySide6  >= 6.6.0
-requests >= 2.31.0
-packaging >= 24.0
+PySide6    >= 6.6.0
+requests   >= 2.31.0
+packaging  >= 24.0
+odfpy      >= 1.4.1
+openpyxl   >= 3.1.0
 ```
 
 ---

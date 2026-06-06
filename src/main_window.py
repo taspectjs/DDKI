@@ -9,6 +9,7 @@ from src.theme import theme_manager, Theme
 from src.entry_view import EntryView
 from src.dashboard import DashboardView
 from src.settings_view import SettingsView
+from src.analyse_view import AnalyseView
 
 
 NAV_ITEMS = [
@@ -138,13 +139,12 @@ class ContentArea(QStackedWidget):
 
         self._dashboard = DashboardView()    # index 0
         self._entry_view = EntryView()       # index 1
-        self._analyse_lbl = QLabel("Analyse")  # index 2
-        self._analyse_lbl.setAlignment(Qt.AlignCenter)
+        self._analyse = AnalyseView()        # index 2
         self._settings = SettingsView()      # index 3
 
         self.addWidget(self._dashboard)
         self.addWidget(self._entry_view)
-        self.addWidget(self._analyse_lbl)
+        self.addWidget(self._analyse)
         self.addWidget(self._settings)
 
         self._dashboard.refresh()
@@ -154,12 +154,12 @@ class ContentArea(QStackedWidget):
         self.setCurrentIndex(index)
         if index == 0:
             self._dashboard.refresh()
+        elif index == 2:
+            self._analyse.refresh()
 
     def apply_theme(self, t: Theme):
         self.setStyleSheet(f"background: {t.content_bg};")
-        self._analyse_lbl.setStyleSheet(
-            f"background: {t.content_bg}; color: {t.content_text}; font-size: 22px;"
-        )
+        self._analyse.apply_theme(t)
 
 
 class MainWindow(QMainWindow):
