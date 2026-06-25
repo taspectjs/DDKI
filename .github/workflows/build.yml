@@ -61,6 +61,7 @@ jobs:
                 --collect-all 'openpyxl' \
                 /app/main.py
 
+              chmod +x /app/dist/DDKI-\${VERSION}-linux
               echo \"Build complete: dist/DDKI-\${VERSION}-linux\"
             "
 
@@ -69,9 +70,6 @@ jobs:
         run: |
           VERSION=$(python3 -c "exec(open('version.py').read()); print(__version__)")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Make binary executable
-        run: chmod +x dist/DDKI-${{ steps.ver.outputs.version }}-linux
 
       # Creates a GitHub Release and uploads the binary automatically
       - name: Create GitHub Release
