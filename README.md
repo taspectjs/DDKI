@@ -2,7 +2,7 @@
 
 **DDKI** ist eine Linux-Desktop-Anwendung zur Erfassung, Verwaltung und Auswertung von täglichen Fahrstrecken – entwickelt mit Python und PySide6 (Qt6).
 
-> Version 0.5.0 · Linux · Python 3.11+
+> Version 0.5.1 · Linux · Python 3.11+
 
 ---
 
@@ -354,6 +354,10 @@ Alle Pakete werden durch `install.sh` automatisch im Virtual Environment install
 ---
 
 ## Changelog
+
+### v0.5.1
+- **Fix:** Binary-Kompatibilität für Ubuntu 24.04 und ältere Systeme wiederhergestellt (GLIBC 2.43 → 2.31)
+- Build auf `python:3.11-slim-bullseye` (Debian 11, GLIBC 2.31) via Docker und GitHub Actions
 
 ### v0.5.0
 - **Neu:** Import aus ODS-, XLSX- und XLS-Dateien mit farbcodiertem Vorschau-Dialog (identisch / neu / Konflikt)
