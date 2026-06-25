@@ -1,0 +1,93 @@
+name: Build & Release
+
+# Triggers on any v* tag push (e.g. git tag v0.5.0 && git push origin v0.5.0)
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build Linux binary (GLIBC 2.31)
+    runs-on: ubuntu-latest   # runner OS doesn't matter — we build inside Docker
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Build inside python:3.11-slim-bullseye (Debian 11, GLIBC 2.31, Python 3.11)
+      # Rule: build on the OLDEST glibc you want to support → binary runs everywhere newer.
+      # GLIBC 2.31 covers: Ubuntu 20.04, 22.04, 24.04 and all compatible distros.
+      - name: Build with PyInstaller in Docker
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE":/app \
+            -w /app \
+            python:3.11-slim-bullseye bash -c "
+              set -e
+              export DEBIAN_FRONTEND=noninteractive
+
+              # Qt runtime libraries needed at build time
+              apt-get update -qq
+              apt-get install -y -qq \
+                libgl1 \
+                libglib2.0-0 \
+                libxcb-xinerama0 \
+                libxcb-icccm4 \
+                libxcb-image0 \
+                libxcb-keysyms1 \
+                libxcb-render-util0 \
+                libxkbcommon-x11-0 \
+                >/dev/null
+
+              pip install --quiet --upgrade pip
+              pip install --quiet -r requirements.txt pyinstaller
+
+              VERSION=\$(python -c \"exec(open('version.py').read()); print(__version__)\")
+              echo \"Building DDKI v\${VERSION}...\"
+
+              pyinstaller \
+                --onefile \
+                --name \"DDKI-\${VERSION}-linux\" \
+                --distpath /app/dist \
+                --workpath /tmp/pyibuild \
+                --specpath /tmp/pyibuild \
+                --hidden-import 'PySide6.QtXml' \
+                --hidden-import 'PySide6.QtCharts' \
+                --hidden-import 'PySide6.QtOpenGL' \
+                --collect-all 'PySide6' \
+                --collect-all 'odf' \
+                --collect-all 'openpyxl' \
+                /app/main.py
+
+              echo \"Build complete: dist/DDKI-\${VERSION}-linux\"
+            "
+
+      - name: Read version
+        id: ver
+        run: |
+          VERSION=$(python3 -c "exec(open('version.py').read()); print(__version__)")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Make binary executable
+        run: chmod +x dist/DDKI-${{ steps.ver.outputs.version }}-linux
+
+      # Creates a GitHub Release and uploads the binary automatically
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "DDKI v${{ steps.ver.outputs.version }}"
+          body: |
+            ## DDKI v${{ steps.ver.outputs.version }}
+
+            ### Installation
+            ```bash
+            chmod +x DDKI-${{ steps.ver.outputs.version }}-linux
+            ./DDKI-${{ steps.ver.outputs.version }}-linux
+            ```
+
+            **Kompatibilität:** Ubuntu 20.04+, Debian 11+, und alle Linux-Distributionen mit GLIBC ≥ 2.31
+          files: dist/DDKI-${{ steps.ver.outputs.version }}-linux
+          draft: false
+          prerelease: false
+          generate_release_notes: true
