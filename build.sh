@@ -29,6 +29,7 @@ if command -v docker &>/dev/null && [ "${1}" != "--local" ]; then
             echo '→ Qt-Abhängigkeiten installieren...'
             apt-get update -qq
             apt-get install -y -qq \
+                binutils \
                 libgl1 \
                 libglib2.0-0 \
                 libxcb-xinerama0 \
