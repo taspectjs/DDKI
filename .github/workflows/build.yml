@@ -10,6 +10,8 @@ jobs:
   build:
     name: Build Linux binary (GLIBC 2.31)
     runs-on: ubuntu-latest   # runner OS doesn't matter — we build inside Docker
+    permissions:
+      contents: write        # needed to create GitHub Releases
 
     steps:
       - name: Checkout code
